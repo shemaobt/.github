@@ -51,6 +51,18 @@ We build open-source software to support the OBT workflow: web apps for drafting
 | [`rfcs`](https://github.com/shemaobt/rfcs) | Request for comments and documentation tracking | |
 | [`reference-agents-md`](https://github.com/shemaobt/reference-agents-md) | Reference agent files for IDE-based agents (Cursor, Windsurf) | |
 
+## 👥 Contributors
+
+<div align="center">
+  <a href="https://github.com/antonvinicius"><img src="https://github.com/antonvinicius.png" width="60" height="60" style="border-radius:50%" alt="antonvinicius"/></a>
+  <a href="https://github.com/arimstefanini"><img src="https://github.com/arimstefanini.png" width="60" height="60" style="border-radius:50%" alt="arimstefanini"/></a>
+  <a href="https://github.com/Caliridaniel"><img src="https://github.com/Caliridaniel.png" width="60" height="60" style="border-radius:50%" alt="Caliridaniel"/></a>
+  <a href="https://github.com/fabiiolima"><img src="https://github.com/fabiiolima.png" width="60" height="60" style="border-radius:50%" alt="fabiiolima"/></a>
+  <a href="https://github.com/joaocarvoli"><img src="https://github.com/joaocarvoli.png" width="60" height="60" style="border-radius:50%" alt="joaocarvoli"/></a>
+  <a href="https://github.com/levigtri"><img src="https://github.com/levigtri.png" width="60" height="60" style="border-radius:50%" alt="levigtri"/></a>
+  <a href="https://github.com/MarciaSuzuki"><img src="https://github.com/MarciaSuzuki.png" width="60" height="60" style="border-radius:50%" alt="MarciaSuzuki"/></a>
+</div>
+
 ---
 <div align="center">
   <sub>Built with ❤️ by the Shema Engineering Team</sub>
