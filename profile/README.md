@@ -43,7 +43,6 @@ We use **TypeScript**, **Python**, and **Flutter** across the stack. You can bro
 
 - **Documentation:** [docs.shemaywam.com](https://docs.shemaywam.com/) — architecture, systems, and how our tools fit together.
 - **Website:** [shemaywam.com](https://www.shemaywam.com/) — who we are and how to get involved.
-- **RFCs:** [github.com/shemaobt/rfcs](https://github.com/shemaobt/rfcs) — design proposals and documentation tracking.
 
 ---
 
