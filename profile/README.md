@@ -46,20 +46,6 @@ We use **TypeScript**, **Python**, and **Flutter** across the stack. You can bro
 
 ---
 
-## 👥 Contributors
-
-<div align="center">
-  <a href="https://github.com/antonvinicius"><img src="https://images.weserv.nl/?url=github.com/antonvinicius.png&w=60&h=60&fit=cover&mask=circle" alt="antonvinicius"/></a>
-  <a href="https://github.com/arimstefanini"><img src="https://images.weserv.nl/?url=github.com/arimstefanini.png&w=60&h=60&fit=cover&mask=circle" alt="arimstefanini"/></a>
-  <a href="https://github.com/Caliridaniel"><img src="https://images.weserv.nl/?url=github.com/Caliridaniel.png&w=60&h=60&fit=cover&mask=circle" alt="Caliridaniel"/></a>
-  <a href="https://github.com/fabiiolima"><img src="https://images.weserv.nl/?url=github.com/fabiiolima.png&w=60&h=60&fit=cover&mask=circle" alt="fabiiolima"/></a>
-  <a href="https://github.com/joaocarvoli"><img src="https://images.weserv.nl/?url=github.com/joaocarvoli.png&w=60&h=60&fit=cover&mask=circle" alt="joaocarvoli"/></a>
-  <a href="https://github.com/levigtri"><img src="https://images.weserv.nl/?url=github.com/levigtri.png&w=60&h=60&fit=cover&mask=circle" alt="levigtri"/></a>
-  <a href="https://github.com/MarciaSuzuki"><img src="https://images.weserv.nl/?url=github.com/MarciaSuzuki.png&w=60&h=60&fit=cover&mask=circle" alt="MarciaSuzuki"/></a>
-</div>
-
----
-
 <div align="center">
   <sub>Built with ❤️ by the Shema Engineering Team</sub>
 </div>
