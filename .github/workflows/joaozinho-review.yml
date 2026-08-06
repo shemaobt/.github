@@ -29,7 +29,7 @@ on:
         type: string
         default: claude-opus-5
       verdict_mode:
-        description: 'comment = never approves or blocks (default) | full = approve / request changes'
+        description: 'comment = never approves or blocks (default) | full = real verdict, approves or requests changes'
         required: false
         type: string
         default: comment
@@ -84,6 +84,62 @@ jobs:
           path: .joaozinho-spec
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Collect prior Joãozinho passes
+        id: prior
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p .joaozinho-state
+          gh api "repos/$REPO/pulls/$PR/reviews" --paginate > .joaozinho-state/reviews.json
+          gh api "repos/$REPO/pulls/$PR/comments" --paginate > .joaozinho-state/comments.json
+
+          # One "pass" is one head SHA this bot has already reviewed, not one
+          # review object — it posts several review objects per pass.
+          passes=$(jq '[.[] | select(.user.type == "Bot") | .commit_id] | unique | length' .joaozinho-state/reviews.json)
+          last_sha=$(jq -r '[.[] | select(.user.type == "Bot")] | sort_by(.submitted_at) | last | .commit_id // ""' .joaozinho-state/reviews.json)
+          open_points=$(jq '[.[] | select(.in_reply_to_id == null and .user.type == "Bot")] | length' .joaozinho-state/comments.json)
+
+          echo "passes=$passes" >> "$GITHUB_OUTPUT"
+          echo "pass_index=$((passes + 1))" >> "$GITHUB_OUTPUT"
+          echo "last_sha=$last_sha" >> "$GITHUB_OUTPUT"
+          echo "head_unchanged=$([ "$last_sha" = "$HEAD_SHA" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "open_points=$open_points" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "# Prior Joãozinho passes on this PR"
+            echo
+            echo "- passes already done: $passes"
+            echo "- this is pass: $((passes + 1))"
+            echo "- head SHA you last reviewed: ${last_sha:-none}"
+            echo "- head SHA now: $HEAD_SHA"
+            echo
+            if [ "$passes" -gt 0 ]; then
+              echo "## Points you already raised, with the author's replies"
+              echo
+              jq -r --arg repo "$REPO" --arg pr "$PR" '
+                (map(select(.in_reply_to_id != null))
+                  | group_by(.in_reply_to_id)
+                  | map({key: (.[0].in_reply_to_id | tostring), value: .})
+                  | from_entries) as $replies
+                | map(select(.in_reply_to_id == null and .user.type == "Bot"))
+                | .[]
+                | "### \(.path):\(.line // .original_line // "?") — reply on this thread with: gh api repos/\($repo)/pulls/\($pr)/comments/\(.id)/replies -f body=\"...\"\n\nYOU RAISED:\n\(.body)\n\n"
+                  + (($replies[(.id | tostring)] // [])
+                      | map("REPLY from @\(.user.login):\n\(.body)")
+                      | join("\n\n")
+                      | if . == "" then "(no reply from the author)" else . end)
+                  + "\n"
+              ' .joaozinho-state/comments.json
+            else
+              echo "First pass on this PR — nothing raised yet."
+            fi
+          } > .joaozinho-state/prior-review.md
+
       - name: Resolve lens pack
         id: spec
         shell: bash
@@ -123,6 +179,9 @@ jobs:
             PR: #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}
             AUTHOR: @${{ github.event.pull_request.user.login }}
             VERDICT MODE: ${{ inputs.verdict_mode }}
+            PASS: ${{ steps.prior.outputs.pass_index }} (you have already reviewed
+            ${{ steps.prior.outputs.passes }} head SHA(s) on this PR)
+            HEAD UNCHANGED SINCE YOUR LAST PASS: ${{ steps.prior.outputs.head_unchanged }}
 
             You are Joãozinho, the automated first-pass reviewer for this org. You
             run because @${{ inputs.reviewer_login }} was requested as a reviewer.
@@ -134,6 +193,9 @@ jobs:
               1. .joaozinho-spec/joaozinho/review-style.md
               2. ${{ steps.spec.outputs.pack }}
               3. ${{ steps.spec.outputs.guidelines }}   (this repo's agent guidelines; skip if blank)
+              4. .joaozinho-state/prior-review.md   (what you already said here and
+                 what the author answered — read it before the diff, it decides
+                 what this pass is even allowed to do)
 
             Then: `gh pr view ${{ github.event.pull_request.number }}` for the
             stated intent (you need it for lens 5), then `gh pr diff`. The PR head
@@ -159,6 +221,47 @@ jobs:
             PR size. If the diff is clean, post no inline comments at all and say
             so in one line. **Zero findings is a good outcome, not a failure.**
 
+            CONVERGENCE — a re-review must END the conversation, not extend it.
+            You get re-triggered every time the author re-requests a review, and
+            each pass you spend hunting for something new is a pass the PR does
+            not get merged. A review that never converges is a broken review.
+
+            Your budget for NEW findings shrinks every pass, and never grows back:
+              * PASS 1 — normal full review.
+              * PASS 2 — your job is to VERIFY the points in prior-review.md
+                against the code at head. You may open AT MOST 2 new findings, and
+                only in lines that changed since ${{ steps.prior.outputs.last_sha }}
+                (`git diff ${{ steps.prior.outputs.last_sha }}..HEAD`). Untouched
+                code is settled — you already passed on it.
+              * PASS 3 AND LATER — ZERO new findings. None. You verify what is
+                outstanding and you give the verdict. If you catch yourself
+                thinking "but there is also…", that thought is out of budget:
+                drop it.
+              * HEAD UNCHANGED SINCE YOUR LAST PASS — zero new findings regardless
+                of pass number. Nothing changed, so there is nothing new to find;
+                re-verify the open points and close out.
+
+            And on any pass after the first:
+              * NEVER open a second thread for a point already in prior-review.md.
+                Reply on the existing thread instead, with `gh api
+                repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/<comment_id>/replies -f body="..."`.
+              * A point you raised and the author FIXED: say nothing at all. Do
+                not congratulate, do not re-explain, do not post "resolved". A
+                silent fixed thread is the correct outcome.
+              * A point the author ANSWERED with a reason (out of scope, booked on
+                another ticket, the prototype says otherwise): accept it and let
+                it go, unless the code at head directly contradicts what they
+                said. Being answered is not the same as being obeyed. You do not
+                get to re-litigate it on a later pass.
+              * A point you raised that is still NOT fixed and NOT answered: one
+                short reply on that thread. Do not restate the whole argument —
+                "still here I think" is enough.
+              * NEVER escalate. Something you called a nit on pass 1 cannot become
+                a blocker on pass 2 because nothing else was left to say.
+              * A fix that landed and works, but not the way you would have
+                written it, is DONE. Style preference on someone else's fix is
+                not a finding.
+
             VOICE: §2 of review-style.md, and match it exactly — one line to four
             sentences, hedged ("Maybe…", "I think not", "Just make sure here…"),
             delegating ("Could you explore that?", "please verify that and if …
@@ -181,16 +284,32 @@ jobs:
                   Never approve, never request changes. @${{ inputs.reviewer_login }}
                   is still the requested reviewer and his verdict is the one that
                   counts.
-                * VERDICT MODE `full`:
-                    --request-changes if there are lens 1-4 findings, else --approve.
-                  Even then, do not gate on nits.
+                * VERDICT MODE `full`: your verdict is real — it blocks or it
+                  releases, so it has to mean something. Decide on the state of
+                  the code AT HEAD, counting the outstanding points from
+                  prior-review.md together with anything new from this pass:
+                    --request-changes  ONLY if at least one lens 1-4 finding is
+                      still live at head — not fixed, and not answered with a
+                      reason you accepted. Name it in the body in one sentence so
+                      the author knows exactly what unblocks it.
+                    --approve  in every other case. That includes: nothing found;
+                      everything you raised got fixed; what is left is nits;
+                      what is left was answered as out of scope or booked on
+                      another ticket. §0 of review-style.md is explicit that he
+                      approves with his own comments still open — do the same.
+                  Never gate on a nit, on a preference, or on something you would
+                  have written differently. If you cannot name the concrete defect
+                  that is still live, you are approving.
+                  And note you are the FIRST pass, not the last: @${{ inputs.reviewer_login }}
+                  reviews after you either way, so an approve from you is "I found
+                  nothing that blocks", never "this is cleared to merge".
             - Never merge, never push commits, never edit files, never resolve
               threads, never comment on `DS-PROJECT/` as if it were yours to change.
             - Then stop.
           claude_args: |
             --model ${{ inputs.model }}
             --max-turns ${{ inputs.max_turns }}
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git log:*),Bash(git diff:*),Read,Grep,Glob"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(gh api:*),Bash(git log:*),Bash(git diff:*),Read,Grep,Glob"
 
       - name: Render cost summary
         id: cost
