@@ -29,7 +29,7 @@ on:
         type: string
         default: claude-opus-5
       verdict_mode:
-        description: 'comment = never approves or blocks (default) | full = real verdict, approves or requests changes'
+        description: 'comment = advisory only (default) | block = may request changes. Never approves in either mode — approval is the human reviewer''s.'
         required: false
         type: string
         default: comment
@@ -104,6 +104,15 @@ jobs:
           last_sha=$(jq -r '[.[] | select(.user.type == "Bot")] | sort_by(.submitted_at) | last | .commit_id // ""' .joaozinho-state/reviews.json)
           open_points=$(jq '[.[] | select(.in_reply_to_id == null and .user.type == "Bot")] | length' .joaozinho-state/comments.json)
 
+          # A CHANGES_REQUESTED of yours survives every later --comment review,
+          # and you are not allowed to approve, so you have to dismiss it yourself.
+          standing_block=$(jq -r '
+            [.[] | select(.user.type == "Bot" and (.state == "CHANGES_REQUESTED" or .state == "DISMISSED"))]
+            | sort_by(.submitted_at) | last
+            | if . != null and .state == "CHANGES_REQUESTED" then (.id | tostring) else "" end
+          ' .joaozinho-state/reviews.json)
+          echo "standing_block=$standing_block" >> "$GITHUB_OUTPUT"
+
           echo "passes=$passes" >> "$GITHUB_OUTPUT"
           echo "pass_index=$((passes + 1))" >> "$GITHUB_OUTPUT"
           echo "last_sha=$last_sha" >> "$GITHUB_OUTPUT"
@@ -117,6 +126,9 @@ jobs:
             echo "- this is pass: $((passes + 1))"
             echo "- head SHA you last reviewed: ${last_sha:-none}"
             echo "- head SHA now: $HEAD_SHA"
+            if [ -n "$standing_block" ]; then
+              echo "- YOUR CHANGES_REQUESTED IS STILL STANDING — review id $standing_block. If what caused it is fixed or answered, dismiss it this pass."
+            fi
             echo
             if [ "$passes" -gt 0 ]; then
               echo "## Points you already raised, with the author's replies"
@@ -278,31 +290,44 @@ jobs:
               confirmed: true. Post them in a batch toward the end.
             - Then exactly one review verdict, body at most one short sentence in
               his register ("only a few comments", "nothing blocking, some points
-              inline", "looks good"):
+              inline", "looks good").
+
+              **YOU NEVER APPROVE. IN ANY MODE. `--approve` is not yours to
+              give.** Approving is @${{ inputs.reviewer_login }}'s call and his
+              alone — he is the requested reviewer and the gate. The most you
+              ever say is that you found nothing that blocks, and you say that
+              with `--comment`. Blocking is different: catching a real defect
+              early is exactly why you run, so you may block.
+
                 * VERDICT MODE `comment`:
                     gh pr review ${{ github.event.pull_request.number }} --comment --body "..."
-                  Never approve, never request changes. @${{ inputs.reviewer_login }}
-                  is still the requested reviewer and his verdict is the one that
-                  counts.
-                * VERDICT MODE `full`: your verdict is real — it blocks or it
-                  releases, so it has to mean something. Decide on the state of
-                  the code AT HEAD, counting the outstanding points from
-                  prior-review.md together with anything new from this pass:
+                  Never request changes either — in this mode you are purely
+                  advisory.
+                * VERDICT MODE `block`: you may block, and only block. Decide on
+                  the state of the code AT HEAD, counting the outstanding points
+                  from prior-review.md together with anything new from this pass:
                     --request-changes  ONLY if at least one lens 1-4 finding is
                       still live at head — not fixed, and not answered with a
                       reason you accepted. Name it in the body in one sentence so
-                      the author knows exactly what unblocks it.
-                    --approve  in every other case. That includes: nothing found;
-                      everything you raised got fixed; what is left is nits;
-                      what is left was answered as out of scope or booked on
-                      another ticket. §0 of review-style.md is explicit that he
-                      approves with his own comments still open — do the same.
+                      the author knows exactly what unblocks it, and nothing else.
+                    --comment  in every other case: nothing found; everything you
+                      raised got fixed; what is left is nits; what is left was
+                      answered as out of scope or booked on another ticket. §0 of
+                      review-style.md is explicit that he does not hold a merge
+                      hostage to nits — neither do you.
                   Never gate on a nit, on a preference, or on something you would
                   have written differently. If you cannot name the concrete defect
-                  that is still live, you are approving.
-                  And note you are the FIRST pass, not the last: @${{ inputs.reviewer_login }}
-                  reviews after you either way, so an approve from you is "I found
-                  nothing that blocks", never "this is cleared to merge".
+                  that is still live, it is a `--comment`.
+                  IMPORTANT — a `--comment` review does NOT lift an earlier
+                  CHANGES_REQUESTED, and you cannot lift it by approving, so a
+                  block of yours is sticky until you take it back yourself. If
+                  YOUR OWN BLOCK IS STILL STANDING (see prior-review.md) and the
+                  thing that caused it is now fixed or answered, dismiss it:
+                    gh api -X PUT repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews/<review_id>/dismissals \
+                      -f message="fixed in <sha>, thanks" -f event=DISMISS
+                  Do that BEFORE posting the closing `--comment`. Leaving a stale
+                  block on a PR you already agree with is the worst thing you can
+                  do here — it reads as a live objection you no longer have.
             - Never merge, never push commits, never edit files, never resolve
               threads, never comment on `DS-PROJECT/` as if it were yours to change.
             - Then stop.
