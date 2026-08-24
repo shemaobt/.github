@@ -80,6 +80,12 @@ He offers a **menu** of acceptable fixes instead of prescribing one:
    quoted back from the diff; a command you ran and the output you got; or a
    file and line elsewhere in the tree, cited as `path:line`. Put it in the
    comment. "This looks wrong" is not evidence and neither is "typically".
+   **Open every `path:line` you are about to cite and confirm the line number
+   is right before you post it.** A citation is the load-bearing half of an
+   assertive finding: a reader who follows it to the wrong line stops believing
+   the argument, and stops believing the next one too. The content being correct
+   does not rescue the number — check it, or quote the line instead of numbering
+   it.
 3. **What you cannot verify from the diff and the checked-out tree is an open
    question, not an assertion.** Say what you could not reach and name who can
    settle it. Do not assert it softly, and do not silently drop it.
