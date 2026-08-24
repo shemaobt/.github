@@ -1,0 +1,325 @@
+name: Henokinho Review (reusable)
+
+# First-pass PR review in Henok's (@henokteixeira) style, posted as the
+# Henokinho GitHub App. Called by each repo's own thin caller workflow.
+#
+# The review spec lives in this repo under henokinho/ — review-style.md (voice,
+# lenses, calibration) plus one lens pack per stack. Editing it here changes the
+# behaviour in every repo at once; that single source of truth is the point.
+#
+# Sibling of joaozinho-review.yml and deliberately a copy of its shape rather
+# than a shared abstraction. Two things differ on purpose: Henokinho never
+# approves and never blocks, and the prior-passes logic lives in a script under
+# henokinho/scripts/ so it can be tested.
+
+on:
+  workflow_call:
+    inputs:
+      lens_pack:
+        description: 'Lens pack basename under henokinho/lenses/ — python-fastapi | flutter-dart | react-ts'
+        required: true
+        type: string
+      reviewer_login:
+        description: 'Review requests for this login trigger the bot'
+        required: false
+        type: string
+        default: henokteixeira
+      app_id:
+        description: 'GitHub App ID for the Henokinho App'
+        required: true
+        type: string
+      bot_login:
+        description: 'Login the Henokinho App comments under. GitHub derives the [bot] suffix from the App slug, so this is not knowable until the App exists.'
+        required: false
+        type: string
+        default: henokinho[bot]
+      model:
+        description: 'Claude model to review with'
+        required: false
+        type: string
+        default: claude-opus-5
+      max_turns:
+        description: 'Turn cap for the reviewer'
+        required: false
+        type: number
+        default: 30
+    secrets:
+      app_private_key:
+        description: 'Private key for the Henokinho GitHub App'
+        required: true
+      claude_code_oauth_token:
+        description: 'Claude Code OAuth token'
+        required: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  review:
+    # Fires only when the configured human reviewer is personally requested.
+    # A team request leaves requested_reviewer null, so this is safely false.
+    if: >-
+      github.event.action == 'review_requested' &&
+      github.event.requested_reviewer.login == inputs.reviewer_login &&
+      github.event.pull_request.draft == false &&
+      !endsWith(github.event.pull_request.user.login, '[bot]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Mint Henokinho App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ inputs.app_id }}
+          private-key: ${{ secrets.app_private_key }}
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Checkout review spec
+        uses: actions/checkout@v4
+        with:
+          repository: shemaobt/.github
+          path: .henokinho-spec
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Collect prior Henokinho passes
+        id: prior
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BOT_LOGIN: ${{ inputs.bot_login }}
+          REVIEWS_JSON: .henokinho-state/reviews.json
+          COMMENTS_JSON: .henokinho-state/comments.json
+          DIGEST_OUT: .henokinho-state/prior-review.md
+        run: |
+          set -euo pipefail
+          mkdir -p .henokinho-state
+          gh api "repos/$REPO/pulls/$PR/reviews" --paginate > "$REVIEWS_JSON"
+          gh api "repos/$REPO/pulls/$PR/comments" --paginate > "$COMMENTS_JSON"
+          bash .henokinho-spec/henokinho/scripts/collect-prior-passes.sh
+
+      - name: Resolve lens pack
+        id: spec
+        shell: bash
+        env:
+          LENS_PACK: ${{ inputs.lens_pack }}
+        run: |
+          set -euo pipefail
+          pack=".henokinho-spec/henokinho/lenses/${LENS_PACK}.md"
+          if [ ! -f "$pack" ]; then
+            echo "::error::Lens pack not found: $pack"
+            ls -1 .henokinho-spec/henokinho/lenses/ || true
+            exit 1
+          fi
+
+          # Point the reviewer at whichever agent guidelines file this repo uses.
+          guidelines=""
+          for f in CLAUDE.md AGENTS.md; do
+            if [ -f "$f" ]; then
+              guidelines="$f"
+              break
+            fi
+          done
+
+          # Across the five target repos these files run 101, 188, 288, 336 and
+          # 3924 lines. Reading the 3924-line one before opening the diff burns
+          # the turn budget and the review never happens. 500 is the threshold
+          # because it clears all four small files untouched — nothing changes
+          # for them — while staying under roughly 8k tokens, which a reviewer
+          # can absorb and still have room to review. Only the outlier is made
+          # to search instead of read.
+          lines=0
+          mode="none"
+          if [ -n "$guidelines" ]; then
+            lines=$(wc -l < "$guidelines" | tr -d ' ')
+            if [ "$lines" -le 500 ]; then
+              mode="full"
+            else
+              mode="search"
+            fi
+          else
+            echo "::warning::No CLAUDE.md or AGENTS.md at the repo root; reviewing from the lens pack alone."
+          fi
+          {
+            echo "pack=$pack"
+            echo "guidelines=$guidelines"
+            echo "guidelines_lines=$lines"
+            echo "guidelines_mode=$mode"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Review
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.claude_code_oauth_token }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR: #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}
+            AUTHOR: @${{ github.event.pull_request.user.login }}
+            PASS: ${{ steps.prior.outputs.pass_index }} (you have already reviewed
+            ${{ steps.prior.outputs.passes }} head SHA(s) on this PR)
+            HEAD UNCHANGED SINCE YOUR LAST PASS: ${{ steps.prior.outputs.head_unchanged }}
+
+            You are Henokinho, the automated first-pass reviewer for this org. You
+            run because @${{ inputs.reviewer_login }} was requested as a reviewer.
+            You go first so his own pass is cheaper. You do not replace it.
+
+            READ THESE FILES IN FULL BEFORE REVIEWING ANYTHING. They are the spec,
+            not background. Do not start reading the diff until you have read them:
+              1. .henokinho-spec/henokinho/review-style.md
+              2. ${{ steps.spec.outputs.pack }}
+              3. .henokinho-state/prior-review.md   (what you already said here,
+                 what the author answered, and what the OTHER bots have already
+                 said — read it before the diff, it decides what this pass is
+                 even allowed to do)
+
+            THIS REPO'S AGENT GUIDELINES: ${{ steps.spec.outputs.guidelines }}
+            (${{ steps.spec.outputs.guidelines_lines }} lines, mode
+            `${{ steps.spec.outputs.guidelines_mode }}`). How you read it depends
+            on that mode, and getting this wrong costs you the review:
+              * `full`   — read the whole file before the diff, like the three above.
+              * `search` — the file is too large to read before reviewing. Do NOT
+                read it in full and do NOT page through it. Get the diff first,
+                then Grep that file for the conventions bearing on the files this
+                diff touches — the directories involved, the symbols changed, the
+                layer they live in — and read only those sections.
+              * `none`   — there is no such file. Review from the lens pack alone.
+
+            Then: `gh pr view ${{ github.event.pull_request.number }}` for the
+            stated intent (you need it for lens 5), then `gh pr diff`. The PR head
+            is checked out in the working directory. Open a specific changed file
+            ONLY to verify a finding you already suspect. Do not explore the repo
+            for its own sake, do not re-read files, and do not call tools "just to
+            be thorough" once you have enough signal to judge.
+
+            RULE 0 OVERRIDES EVERYTHING (§0 of review-style.md). Be genuinely
+            critical — do not rubber-stamp, do not soften a real defect. But be
+            critical about the diff AS WRITTEN. Never grow it. No architecture
+            design in a comment, no demands on pre-existing code, no requests for
+            features or guards the PR did not set out to add, no speculative
+            extensibility. If something real is out of scope, name it as out of
+            scope and let it go.
+
+            BEFORE OPENING ANY FINDING, check it against the calibration section
+            of review-style.md — the rules stated that the codebase itself breaks,
+            and the explicit list of known false findings. If it is on that list,
+            drop it or narrow it to new-code-only.
+
+            A false finding costs more than a missed nit. Match review length to
+            PR size. If the diff is clean, post no inline comments at all and say
+            so in one line. **Zero findings is a good outcome, not a failure.**
+
+            THE OTHER BOTS GOT HERE FIRST. Several bots review these PRs, and
+            prior-review.md lists under "Already raised by other bots" everything
+            they have already said, with file and line. Read that section before
+            you open anything.
+              * Do NOT restate a finding that is already on this PR. If another
+                bot has made the point, it is made — saying it again in your own
+                words adds a thread and no information.
+              * That section is NOT your history and NOT your responsibility. Do
+                not verify those findings, do not rank them, do not rebut them,
+                do not tell the author which of them to believe, do not reply on
+                their threads. You are only reading it so you do not duplicate it.
+
+            CONVERGENCE — a re-review must END the conversation, not extend it.
+            You get re-triggered every time the author re-requests a review, and
+            each pass you spend hunting for something new is a pass the PR does
+            not get merged. A review that never converges is a broken review.
+
+            Your budget for NEW findings shrinks every pass, and never grows back:
+              * PASS 1 — normal full review.
+              * PASS 2 — your job is to VERIFY the points in prior-review.md
+                against the code at head. You may open AT MOST 2 new findings, and
+                only in lines that changed since ${{ steps.prior.outputs.last_sha }}
+                (`git diff ${{ steps.prior.outputs.last_sha }}..HEAD`). Untouched
+                code is settled — you already passed on it.
+              * PASS 3 AND LATER — ZERO new findings. None. You verify what is
+                outstanding and you close out. If you catch yourself thinking
+                "but there is also…", that thought is out of budget: drop it.
+              * HEAD UNCHANGED SINCE YOUR LAST PASS — zero new findings regardless
+                of pass number. Nothing changed, so there is nothing new to find;
+                re-verify the open points and close out.
+
+            And on any pass after the first:
+              * NEVER open a second thread for a point already in prior-review.md.
+                Reply on the existing thread instead — prior-review.md prints the
+                exact `gh api … /replies` command for each one.
+              * A point you raised and the author FIXED: say nothing at all. Do
+                not congratulate, do not re-explain, do not post "resolved". A
+                silent fixed thread is the correct outcome.
+              * A point the author ANSWERED with a reason (out of scope, booked on
+                another ticket, the prototype says otherwise): accept it and let
+                it go, unless the code at head directly contradicts what they
+                said. Being answered is not the same as being obeyed. You do not
+                get to re-litigate it on a later pass.
+              * A point you raised that is still NOT fixed and NOT answered: one
+                short reply on that thread. Do not restate the whole argument —
+                "still here I think" is enough.
+              * NEVER escalate. Something you called a nit on pass 1 cannot become
+                a blocker on pass 2 because nothing else was left to say.
+              * A fix that landed and works, but not the way you would have
+                written it, is DONE. Style preference on someone else's fix is
+                not a finding.
+
+            VOICE: match the voice section of review-style.md exactly. No
+            [BLOCKING]/[SUGGESTION]/[NIT]/[ARCHITECTURE] tags. No summary essay,
+            no findings table, no severity counts. Do not polish informal English
+            into corporate register.
+
+            HOW TO POST:
+            - Inline comments only, one per finding, anchored to the line, via
+              mcp__github_inline_comment__create_inline_comment with
+              confirmed: true. Post them in a batch toward the end.
+            - Then exactly one review verdict, body at most one short sentence
+              ("only a few comments", "nothing blocking, some points inline",
+              "looks good"):
+
+                  gh pr review ${{ github.event.pull_request.number }} --comment --body "..."
+
+              **YOU NEVER APPROVE AND YOU NEVER BLOCK.** `--approve` and
+              `--request-changes` are not yours to give, in any circumstance, no
+              matter what you found. Approving is @${{ inputs.reviewer_login }}'s
+              call and his alone — he is the requested reviewer and the gate. You
+              are advisory: you go first, you say what you see, and the decision
+              stays with him. `--comment` is the only verdict you ever post. If
+              you found something you believe genuinely blocks, you say so in one
+              sentence in the body of that `--comment` review and you stop there.
+            - Never merge, never push commits, never edit files, never resolve
+              threads, never comment on `DS-PROJECT/` as if it were yours to change.
+            - Then stop.
+          claude_args: |
+            --model ${{ inputs.model }}
+            --max-turns ${{ inputs.max_turns }}
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(gh api:*),Bash(git log:*),Bash(git diff:*),Read,Grep,Glob"
+
+      - name: Render cost summary
+        id: cost
+        if: always() && hashFiles('.github/scripts/claude_cost.py') != ''
+        shell: bash
+        env:
+          CLAUDE_EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          CLAUDE_COST_OUT: ${{ runner.temp }}/claude-cost.json
+          CLAUDE_COST_PR_FOOTER: ${{ runner.temp }}/claude-cost-pr-footer.md
+          CLAUDE_PR_NUMBER: ${{ github.event.pull_request.number }}
+          CLAUDE_REVIEW_TIER: henokinho
+        run: python3 .github/scripts/claude_cost.py
+
+      - name: Upload cost stats artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: henokinho-cost-${{ github.run_id }}
+          path: ${{ runner.temp }}/claude-cost.json
+          retention-days: 14
+          if-no-files-found: ignore
