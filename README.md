@@ -22,6 +22,22 @@ differ on blocking: Joãozinho may request changes when run in `block` verdict
 mode; Henokinho never blocks in any circumstance and posts only `--comment`
 reviews.
 
+They also differ on how a re-review behaves. Joãozinho may raise something new
+on any pass, under a budget that shrinks as passes go on. Henokinho closes its
+finding set after the first pass: pass 1 produces the complete list and declares
+it closed, and every later pass only verifies that list against the code at
+head. The one exception is a bug introduced by the fix itself, in lines added
+since the previous pass. When every item closes, it says so and stops — that is
+the nearest it comes to approving.
+
+That behaviour is a response to a specific complaint about the first bot: a
+reviewer that finds something different every time it is asked has told the
+author their code is never good enough, and left no version of the diff that
+ends the conversation. The price is recall — a defect missed on pass 1 stays
+missed, because the register cannot be reopened. That trade was made on purpose
+and accepted by the bot's owner; it is not an oversight to be fixed by loosening
+the rule.
+
 They are deliberately separate files rather than one parameterised workflow.
 The duplication is the chosen design: the two reviewers have different policies
 and different specs, and coupling them would mean every change to one is a risk
