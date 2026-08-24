@@ -1,0 +1,22 @@
+[
+  {
+    "user": { "login": "henokinho[bot]" },
+    "commit_id": "aaa1110000000000000000000000000000000000",
+    "submitted_at": "2026-08-01T10:00:00Z"
+  },
+  {
+    "user": { "login": "henokinho[bot]" },
+    "commit_id": "aaa1110000000000000000000000000000000000",
+    "submitted_at": "2026-08-01T10:00:05Z"
+  },
+  {
+    "user": { "login": "coderabbitai[bot]" },
+    "commit_id": "ddd4440000000000000000000000000000000000",
+    "submitted_at": "2026-08-01T18:00:00Z"
+  },
+  {
+    "user": { "login": "henokinho[bot]" },
+    "commit_id": "bbb2220000000000000000000000000000000000",
+    "submitted_at": "2026-08-02T09:00:00Z"
+  }
+]

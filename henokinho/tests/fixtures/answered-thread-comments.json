@@ -1,0 +1,19 @@
+[
+  {
+    "id": 5001,
+    "user": { "login": "henokinho[bot]", "type": "Bot" },
+    "path": "app/foo.py",
+    "line": 12,
+    "original_line": 12,
+    "body": "Maybe the output here could be typed?"
+  },
+  {
+    "id": 5002,
+    "in_reply_to_id": 5001,
+    "user": { "login": "alice", "type": "User" },
+    "path": "app/foo.py",
+    "line": 12,
+    "original_line": 12,
+    "body": "Good point, booked on SHEMA-123."
+  }
+]
