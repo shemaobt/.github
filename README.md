@@ -70,8 +70,11 @@ until the App exists.
 
 Getting that value wrong is not cosmetic: it is what the prior-passes script
 filters on, so a wrong login makes the bot match none of its own history,
-report pass 1 forever, and read its own comments as another bot's. It fails
-this way silently — nothing in the run errors.
+report pass 1 forever, and read its own comments as another bot's. It used to
+fail this way in silence, with nothing in the run erroring. Henokinho now
+compares the login against the App slug it actually authenticated as, before it
+reads anything, and stops the job if they disagree — a review under the wrong
+login is worse than no review, because it quietly disables the closed ledger.
 
 ### Where the behaviour lives
 
@@ -91,6 +94,7 @@ the workflow, so it can be tested:
 
 ```
 ./henokinho/tests/test-collect-prior-passes.sh
+./henokinho/tests/test-check-bot-login.sh
 ```
 
 The suite is plain `bash` and `jq` — no framework, no install step. It runs the
