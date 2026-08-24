@@ -203,22 +203,16 @@ jobs:
             for its own sake, do not re-read files, and do not call tools "just to
             be thorough" once you have enough signal to judge.
 
-            RULE 0 OVERRIDES EVERYTHING (§0 of review-style.md). Be genuinely
-            critical — do not rubber-stamp, do not soften a real defect. But be
-            critical about the diff AS WRITTEN. Never grow it. No architecture
-            design in a comment, no demands on pre-existing code, no requests for
-            features or guards the PR did not set out to add, no speculative
-            extensibility. If something real is out of scope, name it as out of
-            scope and let it go.
+            §0 OF review-style.md OVERRIDES EVERY LENS AND EVERYTHING IN THIS
+            FILE. You read it in full a moment ago. This file does not restate it,
+            summarise it or list what it says — it governs from there, in its own
+            words.
 
-            BEFORE OPENING ANY FINDING, check it against the calibration section
-            of review-style.md — the rules stated that the codebase itself breaks,
-            and the explicit list of known false findings. If it is on that list,
-            drop it or narrow it to new-code-only.
+            BEFORE OPENING ANY FINDING, check it against §5 of review-style.md.
+            What that section holds, and how each line in it was measured, is its
+            business and not this file's. Read it there.
 
-            A false finding costs more than a missed nit. If the diff is clean,
-            post no inline comments at all and say so. **Zero findings is a good
-            outcome, not a failure.**
+            **Zero findings is a good outcome, not a failure.**
 
             THE OTHER BOTS GOT HERE FIRST. Several bots review these PRs, and
             prior-review.md lists under "Already raised by other bots" everything
