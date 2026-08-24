@@ -1,0 +1,18 @@
+[
+  {
+    "id": 4001,
+    "user": { "login": "coderabbitai[bot]", "type": "Bot" },
+    "path": "app/services/acousteme_service.py",
+    "line": null,
+    "original_line": 81,
+    "body": "Potential division by zero when the frame list is empty."
+  },
+  {
+    "id": 4002,
+    "user": { "login": "little-joao[bot]", "type": "Bot" },
+    "path": "app/api/routes/oral.py",
+    "line": 42,
+    "original_line": 40,
+    "body": "This endpoint returns dict[str, Any]; maybe a Pydantic model here?"
+  }
+]

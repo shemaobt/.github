@@ -1,0 +1,10 @@
+[
+  {
+    "id": 5001,
+    "user": { "login": "henokinho[bot]", "type": "Bot" },
+    "path": "app/foo.py",
+    "line": 12,
+    "original_line": 12,
+    "body": "Maybe the output here could be typed?"
+  }
+]

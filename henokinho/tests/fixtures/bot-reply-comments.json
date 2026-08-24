@@ -1,0 +1,19 @@
+[
+  {
+    "id": 6001,
+    "user": { "login": "coderabbitai[bot]", "type": "Bot" },
+    "path": "app/bar.py",
+    "line": 20,
+    "original_line": 20,
+    "body": "This loop hits the database once per item."
+  },
+  {
+    "id": 6002,
+    "in_reply_to_id": 6001,
+    "user": { "login": "henokinho[bot]", "type": "Bot" },
+    "path": "app/bar.py",
+    "line": 20,
+    "original_line": 20,
+    "body": "HENOKINHO-REPLY-BODY same problem here."
+  }
+]
