@@ -60,9 +60,18 @@ jobs:
       claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
-Each bot posts as its own GitHub App. The `[bot]` login GitHub derives from the
-App slug is not knowable until the App exists, which is why Henokinho takes it
-as the `bot_login` input rather than hardcoding it.
+Each bot posts as its own GitHub App, and **the login does not match the
+workflow name**. GitHub builds it from the App's slug plus a `[bot]` suffix, and
+both Apps in this family are named `little-*`: `joaozinho-review.yml` posts as
+`little-joao[bot]`, and `henokinho-review.yml` posts as `little-henok[bot]`.
+Read the login off the App, never off the workflow. Henokinho takes it as the
+`bot_login` input rather than hardcoding it, because the slug is not knowable
+until the App exists.
+
+Getting that value wrong is not cosmetic: it is what the prior-passes script
+filters on, so a wrong login makes the bot match none of its own history,
+report pass 1 forever, and read its own comments as another bot's. It fails
+this way silently — nothing in the run errors.
 
 ### Where the behaviour lives
 
