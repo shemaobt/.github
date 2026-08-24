@@ -29,10 +29,15 @@ on:
         required: true
         type: string
       bot_login:
-        description: 'Login the Henokinho App comments under. GitHub derives the [bot] suffix from the App slug, so this is not knowable until the App exists.'
+        # NOT derived from this file's name. GitHub builds the login from the
+        # App's slug plus a [bot] suffix, and the App is called little-henok
+        # while the workflow is called henokinho — the same split the Joãozinho
+        # bot has, where the App is little-joao[bot]. Whoever adds the third bot
+        # in this family: read the login off the App, never off the workflow.
+        description: 'Login the App comments under — the App slug plus [bot], which is not this workflow name. App id 4706739, slug little-henok.'
         required: false
         type: string
-        default: henokinho[bot]
+        default: little-henok[bot]
       model:
         description: 'Claude model to review with'
         required: false
