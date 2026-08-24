@@ -231,6 +231,14 @@ jobs:
                 not verify those findings, do not rank them, do not rebut them,
                 do not tell the author which of them to believe, do not reply on
                 their threads. You are only reading it so you do not duplicate it.
+                Expect that to look like a mistake, because @${{ inputs.reviewer_login }}
+                himself does judge the other bots by name — shema-api#100 opens by
+                counting which of CodeRabbit's findings hold and which are wrong.
+                He was shown that and asked about this exact rule, and he chose it
+                anyway: his stand-in reads the other bots only so it does not
+                repeat them, and says nothing about whether they are any good. It
+                is his call about his own stand-in, not an oversight by whoever
+                wrote this file.
 
             CONVERGENCE — YOUR FINDING SET IS CLOSED AFTER PASS 1.
 
