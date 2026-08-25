@@ -44,10 +44,20 @@ on:
         type: string
         default: claude-opus-5
       max_turns:
+        # 40 comes from measurement, not from a round number. The first real
+        # run, shema-api#238, took 33 turns: the review was complete and
+        # posted, and then the job failed for exceeding the cap of 30 — the
+        # spend happened and the run went red anyway. Joãozinho's runs on the
+        # same repo measured 25, 17, 28, 14, 21 and 31, so 30 was already tight
+        # for the cheaper bot. Henokinho costs more turns because §0 makes it
+        # verify each finding against the tree before asserting it; that is the
+        # design, not waste. 40 clears the worst case actually observed with
+        # room to spare, and is deliberately not 50 — the cap is also the
+        # ceiling on what one pathological run can spend.
         description: 'Turn cap for the reviewer'
         required: false
         type: number
-        default: 30
+        default: 40
     secrets:
       app_private_key:
         description: 'Private key for the Henokinho GitHub App'
