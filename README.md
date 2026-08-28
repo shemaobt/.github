@@ -7,9 +7,18 @@ reusable workflows that every product repo calls.
 ## Automated PR reviewers
 
 Two bots review pull requests across the org. Each one stands in for a specific
-human and runs **only when that person is personally requested as a reviewer** —
-a request aimed at a team does not fire either of them, and neither runs on a
-draft PR or on a PR opened by a bot.
+human, and there are **two ways to ask for one**: request that person as a
+reviewer, or label the pull request with the bot's own name. A request aimed at
+a team fires neither of them, and neither runs on a draft PR or on a PR opened
+by a bot.
+
+The label is there for the case a review request cannot reach. GitHub refuses a
+request aimed at a pull request's own author — `422 Review cannot be requested
+from pull request author` — so on a repository where the stand-in's human opens
+the pull requests himself, there is no login left to request and the bot can
+never fire. The name is the `label_name` input and defaults to the bot's own.
+**A caller only gets that second way in by putting `labeled` into its own
+`on: pull_request: types:`**; a caller that has not is unchanged.
 
 | Bot | Stands in for | Reusable workflow | Spec |
 |---|---|---|---|
