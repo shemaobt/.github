@@ -24,6 +24,18 @@ on:
         required: false
         type: string
         default: henokteixeira
+      label_name:
+        # Additive by construction rather than by this default. A caller reaches
+        # the label arm of the job's `if` only by putting `labeled` into its own
+        # `on: pull_request: types:`, so a caller that has not behaves exactly as
+        # it did before this input existed, whatever is written here. The default
+        # is the bot's own name rather than an empty string because a caller that
+        # does opt in and forgets to name a label would otherwise get a run that
+        # starts, skips, and looks identical to the guard working.
+        description: 'A label of this name on a pull request triggers the bot, beside the review request and never instead of it'
+        required: false
+        type: string
+        default: henokinho
       app_id:
         description: 'GitHub App ID for the Henokinho App'
         required: true
@@ -71,13 +83,35 @@ env:
 
 jobs:
   review:
-    # Fires only when the configured human reviewer is personally requested.
-    # A team request leaves requested_reviewer null, so this is safely false.
+    # Two ways to ask for this review, and both are decided here rather than in
+    # the callers, so a caller cannot loosen either by copying it wrong.
+    #
+    # The first is the configured human reviewer being personally requested. A
+    # team request leaves requested_reviewer null, so that arm is safely false
+    # for one — the bot answers a person being asked, never a team.
+    #
+    # The second is a label, and it exists for the case the first cannot cover:
+    # GitHub refuses a review request aimed at a pull request's own author —
+    # `422 Review cannot be requested from pull request author` — so on a
+    # repository where the stand-in's human opens the pull requests himself,
+    # requested_reviewer can never carry his login and the first arm can never
+    # fire. On a `labeled` event there is no requested_reviewer at all, which is
+    # why the login test is scoped to its own arm instead of governing both.
+    #
+    # Draft and bot-authored pull requests are excluded on either way in.
+    #
+    # Every line below sits at one indentation on purpose. `>-` folds only
+    # across lines indented alike; indent the inner clauses to read as nesting
+    # and YAML keeps their newlines, and what reaches GitHub is a multi-line
+    # expression rather than this one.
     if: >-
-      github.event.action == 'review_requested' &&
-      github.event.requested_reviewer.login == inputs.reviewer_login &&
-      github.event.pull_request.draft == false &&
-      !endsWith(github.event.pull_request.user.login, '[bot]')
+      (
+      (github.event.action == 'review_requested' && github.event.requested_reviewer.login == inputs.reviewer_login)
+      ||
+      (github.event.action == 'labeled' && github.event.label.name == inputs.label_name)
+      )
+      && github.event.pull_request.draft == false
+      && !endsWith(github.event.pull_request.user.login, '[bot]')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -201,7 +235,8 @@ jobs:
               HEAD UNCHANGED SINCE THAT PASS: ${{ steps.prior.outputs.head_unchanged }}
 
             You are Henokinho, the automated first-pass reviewer for this org. You
-            run because @${{ inputs.reviewer_login }} was requested as a reviewer.
+            run because @${{ inputs.reviewer_login }} was requested as a reviewer,
+            or because the pull request was labelled `${{ inputs.label_name }}`.
             You go first so his own pass is cheaper. You do not replace it.
 
             READ THESE FILES IN FULL BEFORE REVIEWING ANYTHING. They are the spec,
