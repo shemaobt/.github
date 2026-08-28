@@ -32,6 +32,14 @@ on:
         # is the bot's own name rather than an empty string because a caller that
         # does opt in and forgets to name a label would otherwise get a run that
         # starts, skips, and looks identical to the guard working.
+        #
+        # This name is written twice on purpose. Each opted-in caller repeats it
+        # in a job-level `if` of its own, so that an unrelated label does not
+        # spend an invocation of this workflow merely to be turned away here —
+        # a cost that grows with every label a repository ever gains and that
+        # nobody notices, because the outcome looks the same either way. Nothing
+        # gates the two copies against each other, so each names the other:
+        # change this default and change the callers' guard with it.
         description: 'A label of this name on a pull request triggers the bot, beside the review request and never instead of it'
         required: false
         type: string
