@@ -76,6 +76,12 @@ compares the login against the App slug it actually authenticated as, before it
 reads anything, and stops the job if they disagree — a review under the wrong
 login is worse than no review, because it quietly disables the closed ledger.
 
+A caller may request the reviewer with the bot's own App token, as shema-api
+does on every pull request into `dev`. The run then starts under the App's
+login, and the review action refuses a bot actor unless it is named: each
+workflow names the App it authenticated as, and no other bot. A request made by
+some other App still fails with "non-human actor".
+
 ### Where the behaviour lives
 
 A bot's spec directory is the single source of truth for how it reviews:
