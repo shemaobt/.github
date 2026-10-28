@@ -70,6 +70,11 @@ jobs:
         with:
           app-id: ${{ inputs.app_id }}
           private-key: ${{ secrets.app_private_key }}
+          # The App may write code (shema-api's canon sync opens its own PR with it,
+          # ENG-1474), but the reviewer never does: its token is minted read-only
+          # on code and write on pull requests only.
+          permission-contents: read
+          permission-pull-requests: write
 
       - name: Checkout PR branch
         uses: actions/checkout@v4
